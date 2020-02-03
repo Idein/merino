@@ -126,41 +126,34 @@ impl Merino {
         info!("Serving Connections...");
         loop {
             if let Ok((stream, _remote)) = self.listener.accept() {
-                    // TODO Optimize this
-                    let mut client = SOCKClient::new(stream, self.users.clone(), self.auth_methods.clone());
-                    thread::spawn(move || {
-                        match client.init() {
-                            Ok(_) => {},
-                            Err(error) => {
-                                error!("Error! {}", error);
-                                let error_text = format!("{}", error);
-                                
+                // TODO Optimize this
+                let mut client =
+                    SOCKClient::new(stream, self.users.clone(), self.auth_methods.clone());
+                thread::spawn(move || {
+                    if let Err(error) = client.init() {
+                        error!("Error! {}", error);
+                        let error_text = format!("{}", error);
 
-                                let response: ResponseCode;
+                        let response: ResponseCode;
 
-                                if error_text.contains("Host") {
-                                    response = ResponseCode::HostUnreachable;
-                                }
-                                else if error_text.contains("Network"){
-                                    response = ResponseCode::NetworkUnreachable;
-                                }
-                                else if error_text.contains("ttl") {
-                                    response = ResponseCode::TtlExpired
-                                }
-                                else {
-                                    response = ResponseCode::Failure
-                                }
+                        if error_text.contains("Host") {
+                            response = ResponseCode::HostUnreachable;
+                        } else if error_text.contains("Network") {
+                            response = ResponseCode::NetworkUnreachable;
+                        } else if error_text.contains("ttl") {
+                            response = ResponseCode::TtlExpired
+                        } else {
+                            response = ResponseCode::Failure
+                        }
 
-                                if client.error(response).is_err() {
-                                    warn!("Failed to send error code");
-                                };
-                                if client.shutdown().is_err() {
-                                    warn!("Failed to shutdown TcpStream");
-                                };
-                            } 
+                        if client.error(response).is_err() {
+                            warn!("Failed to send error code");
                         };
-                    });
-
+                        if client.shutdown().is_err() {
+                            warn!("Failed to shutdown TcpStream");
+                        };
+                    }
+                });
             }
         }
     }
