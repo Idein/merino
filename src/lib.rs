@@ -130,10 +130,10 @@ impl Merino {
 
                         if client.error(response).is_err() {
                             warn!("Failed to send error code");
-                        };
-                        if client.shutdown().is_err() {
-                            warn!("Failed to shutdown TcpStream");
-                        };
+                        }
+                        if let Err(err) = client.shutdown() {
+                            warn!("Failed to shutdown TcpStream: {:?}", err);
+                        }
                     }
                 });
             }
