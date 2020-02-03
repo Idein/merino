@@ -1,11 +1,15 @@
 #![forbid(unsafe_code)]
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate log;
-use snafu::{Snafu};
+
+pub mod error;
+pub mod protocol;
+
+use error::*;
+use protocol::ResponseCode;
 
 use std::io::prelude::*;
 use std::io::copy;
-use std::error::Error;
 use std::net::{Shutdown, TcpStream, TcpListener, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::{thread};
 
@@ -21,28 +25,6 @@ pub struct User {
     password: String
 }
 
-
-#[derive(Debug, Snafu)]
-/// Possible SOCKS5 Response Codes
-enum ResponseCode {
-    Success = 0x00,
-    #[snafu(display("SOCKS5 Server Failure"))]
-    Failure = 0x01,
-    #[snafu(display("SOCKS5 Rule failure"))]
-    RuleFailure = 0x02,
-    #[snafu(display("network unreachable"))]
-    NetworkUnreachable = 0x03,
-    #[snafu(display("host unreachable"))]
-    HostUnreachable = 0x04,
-    #[snafu(display("connection refused"))]
-    ConnectionRefused = 0x05,
-    #[snafu(display("TTL expired"))]
-    TtlExpired = 0x06,
-    #[snafu(display("Command not supported"))]
-    CommandNotSupported = 0x07,
-    #[snafu(display("Addr Type not supported"))]
-    AddrTypeNotSupported = 0x08
-}
 
 /// DST.addr variant types
 #[derive(PartialEq)]
@@ -113,7 +95,7 @@ pub struct Merino {
 
 impl Merino {
     /// Create a new Merino instance
-    pub fn new(port: u16,  ip: &str, auth_methods: Vec<u8>, users: Vec<User>) -> Result<Self, Box<dyn Error>> {
+    pub fn new(port: u16,  ip: &str, auth_methods: Vec<u8>, users: Vec<User>) -> Result<Self, Error> {
         info!("Listening on {}:{}", ip, port);
         Ok(Merino {
             listener: TcpListener::bind((ip, port))?,
@@ -122,7 +104,7 @@ impl Merino {
         })
     }
 
-    pub fn serve(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn serve(&mut self) -> Result<(), Error> {
         info!("Serving Connections...");
         loop {
             if let Ok((stream, _remote)) = self.listener.accept() {
@@ -185,18 +167,18 @@ impl SOCKClient {
     }
 
     /// Send an error to the client
-    pub fn error(&mut self, r: ResponseCode) -> Result<(), Box<dyn Error>> {
+    pub fn error(&mut self, r: ResponseCode) -> Result<(), Error> {
         self.stream.write_all(&[5, r as u8])?;
         Ok(())
     }
 
     /// Shutdown a client
-    pub fn shutdown(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn shutdown(&mut self) -> Result<(), Error> {
         self.stream.shutdown(Shutdown::Both)?;
         Ok(())
     }
 
-    fn init(&mut self) -> Result<(), Box<dyn Error>> {
+    fn init(&mut self) -> Result<(), Error> {
         debug!("New connection from: {}", self.stream.peer_addr()?.ip());
         let mut header = [0u8; 2];
         // Read a byte from the stream and determine the version being requested
@@ -223,7 +205,7 @@ impl SOCKClient {
         Ok(())
     }
 
-    fn auth(&mut self) -> Result<(), Box<dyn Error>> {
+    fn auth(&mut self) -> Result<(), Error> {
         debug!("Authenticating w/ {}", self.stream.peer_addr()?.ip());
         // Get valid auth methods
         let methods = self.get_avalible_methods()?;
@@ -312,13 +294,13 @@ impl SOCKClient {
             response[1] = AuthMethods::NoMethods as u8;
             self.stream.write_all(&response)?;
             self.shutdown()?;
-            Err(Box::new(ResponseCode::Failure))
+            Err(ResponseCode::Failure.into())
         }
 
     }
 
     /// Handles a client
-    pub fn handle_client(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn handle_client(&mut self) -> Result<(), Error> {
         debug!("Handling requests for {}", self.stream.peer_addr()?.ip());
         // Read request
         // loop {
@@ -391,7 +373,7 @@ impl SOCKClient {
     }
 
     /// Return the avalible methods based on `self.auth_nmethods`
-    fn get_avalible_methods(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn get_avalible_methods(&mut self) -> Result<Vec<u8>, Error> {
         let mut methods: Vec<u8> = Vec::with_capacity(self.auth_nmethods as usize);
         for _ in 0..self.auth_nmethods {
             let mut method = [0u8; 1];
@@ -405,7 +387,7 @@ impl SOCKClient {
 }
 
 /// Convert an address and AddrType to a SocketAddr
-fn addr_to_socket(addr_type: &AddrType, addr: &[u8], port: u16) -> Result<Vec<SocketAddr>, Box<dyn Error>> {
+fn addr_to_socket(addr_type: &AddrType, addr: &[u8], port: u16) -> Result<Vec<SocketAddr>, Error> {
     match addr_type {
         AddrType::V6 => {
             let new_addr = (0..8).map(|x| {
@@ -466,7 +448,7 @@ struct SOCKSReq {
 
 impl SOCKSReq {
     /// Parse a SOCKS Req from a TcpStream
-    fn from_stream(stream: &mut TcpStream) -> Result<Self, Box<dyn Error>> {
+    fn from_stream(stream: &mut TcpStream) -> Result<Self, Error> {
         let mut packet = [0u8; 4];
         // Read a byte from the stream and determine the version being requested
         stream.read_exact(&mut packet)?;
@@ -508,7 +490,7 @@ impl SOCKSReq {
 
         trace!("Getting Addr");
         // Get Addr from addr_type and stream
-        let addr: Result<Vec<u8>, Box<dyn Error>> = match addr_type {
+        let addr: Result<Vec<u8>, Error> = match addr_type {
             AddrType::Domain => {
                 let mut dlen = [0u8; 1];
                 stream.read_exact(&mut dlen)?;
