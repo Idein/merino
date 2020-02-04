@@ -262,4 +262,24 @@ impl<'a> ToSocketAddrs for Address<'a> {
     }
 }
 
+/// SOCK5 CMD Type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SockCommand {
+    Connect = 0x01,
+    Bind = 0x02,
+    UdpAssosiate = 0x3
+}
+
+impl TryFrom<u8> for SockCommand {
+    type Error = TryFromU8Error;
+    /// Parse Byte to Command
+    fn try_from(n: u8) -> Result<SockCommand, Self::Error> {
+        match n {
+            1 => Ok(SockCommand::Connect),
+            2 => Ok(SockCommand::Bind),
+            3 => Ok(SockCommand::UdpAssosiate),
+            _ => Err(TryFromU8Error { value: n, to: "protocol::SockCommand".to_owned() })
+        }
+    }
+}
 

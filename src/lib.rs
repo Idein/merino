@@ -7,7 +7,7 @@ pub mod protocol;
 
 use error::*;
 pub use protocol::{AuthMethods, ResponseCode};
-use protocol::{AddrType, Address};
+use protocol::{AddrType, Address, SockCommand};
 
 use std::convert::TryInto;
 use std::io::prelude::*;
@@ -26,28 +26,6 @@ pub struct User {
     pub username: String,
     password: String
 }
-
-
-/// SOCK5 CMD Type
-#[derive(Debug)]
-enum SockCommand {
-    Connect = 0x01,
-    Bind = 0x02,
-    UdpAssosiate = 0x3
-}
-
-impl SockCommand {
-    /// Parse Byte to Command
-    fn from(n: usize) -> Option<SockCommand> {
-        match n {
-            1 => Some(SockCommand::Connect),
-            2 => Some(SockCommand::Bind),
-            3 => Some(SockCommand::UdpAssosiate),
-            _ => None
-        }
-    }
-}
-
 
 pub struct Merino {
     listener: TcpListener,
@@ -319,9 +297,6 @@ impl SOCKClient {
                 SockCommand::UdpAssosiate => { },
             }
 
-
-
-
             // connected = false;
         // }
 
@@ -371,18 +346,14 @@ impl SOCKSReq {
         }
 
         // Get command
-        let mut command: SockCommand = SockCommand::Connect;
-        match SockCommand::from(packet[1] as usize) {
-            Some(com) => {
-                command = com;
-                Ok(())
-            },
-            None => {
-                warn!("Invalid Command");
+        let command: SockCommand = match packet[1].try_into() {
+            Ok(com) => com,
+            Err(err) => {
+                error!("Invalid Command: {:?}", err);
                 stream.shutdown(Shutdown::Both)?;
-                Err(ResponseCode::CommandNotSupported)
+                return Err(ResponseCode::CommandNotSupported.into())
             }
-        }?;
+        };
 
         // DST.address
         let addr_type: AddrType = match packet[3].try_into() {
