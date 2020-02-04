@@ -393,6 +393,7 @@ impl SOCKSReq {
                 return Err(ResponseCode::AddrTypeNotSupported.into())
             }
         };
+        trace!("AddrType: {}", addr_type);
 
         trace!("Getting Addr");
         // Get Addr from addr_type and stream
