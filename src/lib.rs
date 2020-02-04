@@ -7,7 +7,7 @@ pub mod protocol;
 
 use error::*;
 pub use protocol::{AuthMethods, ResponseCode};
-use protocol::AddrType;
+use protocol::{AddrType, Address};
 
 use std::convert::TryInto;
 use std::io::prelude::*;
@@ -281,18 +281,17 @@ impl SOCKClient {
                   req.port
             );
 
-
             // Respond
             match req.command {
                 // Use the Proxy to connect to the specified addr/port
                 SockCommand::Connect => {
                     debug!("Handling CONNECT Command");
 
-                    let sock_addr = addr_to_socket(&req.addr_type, &req.addr, req.port)?;
+                    let sock_addr = req.address().to_socket_addrs()?;
 
                     trace!("Connecting to: {:?}", sock_addr);
 
-                    let target = TcpStream::connect(&sock_addr[..])?;
+                    let target = TcpStream::connect(sock_addr.as_slice())?;
 
                     trace!("Connected!");
 
@@ -348,38 +347,6 @@ impl SOCKClient {
     }
 }
 
-/// Convert an address and AddrType to a SocketAddr
-fn addr_to_socket(addr_type: &AddrType, addr: &[u8], port: u16) -> Result<Vec<SocketAddr>, Error> {
-    match addr_type {
-        AddrType::V6 => {
-            let new_addr = (0..8).map(|x| {
-                trace!("{} and {}", x * 2, (x * 2) + 1);
-                (u16::from(addr[(x * 2)]) << 8) | u16::from(addr[(x * 2) + 1])
-            }).collect::<Vec<u16>>();
-
-
-            Ok(vec![SocketAddr::from(
-                SocketAddrV6::new(
-                    Ipv6Addr::new(
-                        new_addr[0], new_addr[1], new_addr[2], new_addr[3], new_addr[4], new_addr[5], new_addr[6], new_addr[7]), 
-                    port, 0, 0)
-            )])
-        },
-        AddrType::V4 => {
-            Ok(vec![SocketAddr::from(SocketAddrV4::new(Ipv4Addr::new(addr[0], addr[1], addr[2], addr[3]), port))])
-        },
-        AddrType::Domain => {
-            let mut domain = String::from_utf8_lossy(&addr[..]).to_string();
-            domain.push_str(&":");
-            domain.push_str(&port.to_string());
-
-            Ok(domain.to_socket_addrs()?.collect())
-        }
-
-    }
-}
-
-
 /// Convert an AddrType and address to String
 fn pretty_print_addr(addr_type: &AddrType, addr: &[u8]) -> String {
     match addr_type {
@@ -406,6 +373,12 @@ struct SOCKSReq {
     pub addr_type: AddrType,
     pub addr: Vec<u8>,
     pub port: u16
+}
+
+impl SOCKSReq {
+    fn address(&self) -> Address {
+        Address::new(self.addr_type, &self.addr, self.port)
+    }
 }
 
 impl SOCKSReq {
@@ -436,19 +409,14 @@ impl SOCKSReq {
         }?;
 
         // DST.address
-
-        let mut addr_type: AddrType = AddrType::V6;
-        match packet[3].try_into() {
-            Ok(addr) => {
-                addr_type = addr ;
-                Ok(())
-            },
+        let addr_type: AddrType = match packet[3].try_into() {
+            Ok(addr) => addr,
             Err(err) => {
                 error!("No Addr: {:?}", err);
                 stream.shutdown(Shutdown::Both)?;
-                Err(ResponseCode::AddrTypeNotSupported)
+                return Err(ResponseCode::AddrTypeNotSupported.into())
             }
-        }?;
+        };
 
         trace!("Getting Addr");
         // Get Addr from addr_type and stream

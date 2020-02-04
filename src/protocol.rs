@@ -1,6 +1,8 @@
 ///! rfc1928 SOCKS Protocol Version 5
 use std::fmt;
+use std::io;
 use std::convert::TryFrom;
+use std::net::{SocketAddr, ToSocketAddrs, Ipv6Addr, Ipv4Addr, SocketAddrV4, SocketAddrV6};
 
 /// Section 6. Replies > Reply field value
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -129,7 +131,6 @@ pub enum AddrType {
     V6 = 0x04,
 }
 
-
 impl TryFrom<u8> for AddrType {
     type Error = TryFromU8Error;
     /// Parse Byte to Command
@@ -150,6 +151,70 @@ impl fmt::Display for AddrType {
             V4 => write!(f, "Version4 IP Address"),
             Domain => write!(f, "Fully Qualified Domain Name"),
             V6 => write!(f, "Version6 IP Address"),
+        }
+    }
+}
+
+
+/// ATYP and (DST or BND)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Address<'a> {
+    r#type: AddrType,
+    data: &'a [u8],
+    port: u16,
+}
+
+impl<'a> Address<'a> {
+    pub fn new(r#type: AddrType, data: &'a [u8], port: u16) -> Self {
+        Address {
+            r#type,
+            data,
+            port,
+        }
+    }
+}
+
+impl<'a> ToSocketAddrs for Address<'a> {
+    type Iter = std::vec::IntoIter<SocketAddr>;
+
+    /// Convert an address and AddrType to a SocketAddr
+    fn to_socket_addrs(&self) -> io::Result<Self::Iter> {
+        match self.r#type {
+            AddrType::V6 => {
+                let addr: Vec<_> = self.data
+                    .chunks_exact(2)
+                    .map(|c| u16::from_ne_bytes([c[0], c[1]]))
+                    .collect();
+
+                Ok(vec![
+                    SocketAddrV6::new(
+                        Ipv6Addr::new(
+                            addr[0], addr[1],
+                            addr[2], addr[3],
+                            addr[4], addr[5],
+                            addr[6], addr[7]
+                        ),
+                        self.port, 0, 0
+                    ).into()
+                ].into_iter())
+            },
+            AddrType::V4 => {
+                Ok(vec![
+                   SocketAddrV4::new(
+                       Ipv4Addr::new(
+                           self.data[0],
+                           self.data[1],
+                           self.data[2],
+                           self.data[3]
+                        ),
+                        self.port
+                   ).into()
+                ].into_iter())
+            },
+            AddrType::Domain => {
+                let host = format!("{}:{}", String::from_utf8_lossy(&self.data[..]), self.port);
+                Ok(host.to_socket_addrs()?)
+            }
         }
     }
 }
