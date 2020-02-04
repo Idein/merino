@@ -12,7 +12,7 @@ use protocol::{AddrType, Address};
 use std::convert::TryInto;
 use std::io::prelude::*;
 use std::io::copy;
-use std::net::{Shutdown, TcpStream, TcpListener, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::net::{Shutdown, TcpStream, TcpListener, ToSocketAddrs};
 use std::{thread};
 
 
@@ -273,12 +273,10 @@ impl SOCKClient {
             }
 
             // Log Request
-            let displayed_addr = pretty_print_addr(&req.addr_type, &req.addr);
-            info!("New Request: Source: {}, Command: {:?} Addr: {}, Port: {}", 
+            info!("New Request: Source: {}, Command: {:?} Addr: {}", 
                   self.stream.peer_addr()?.ip(),
                   req.command, 
-                  displayed_addr,
-                  req.port
+                  req.address()
             );
 
             // Respond
@@ -344,25 +342,6 @@ impl SOCKClient {
             }
         }
         Ok(methods)
-    }
-}
-
-/// Convert an AddrType and address to String
-fn pretty_print_addr(addr_type: &AddrType, addr: &[u8]) -> String {
-    match addr_type {
-        AddrType::Domain => {
-            String::from_utf8_lossy(addr).to_string()
-        },
-        AddrType::V4 => {
-            addr.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join(".")
-        },
-        AddrType::V6 => {
-            let addr_16 = (0..8).map(|x| {
-                (u16::from(addr[(x * 2)]) << 8) | u16::from(addr[(x * 2) + 1])
-            }).collect::<Vec<u16>>();
-
-            addr_16.iter().map(|x| format!("{:x}", x)).collect::<Vec<String>>().join(":")
-        }
     }
 }
 
