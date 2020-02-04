@@ -59,12 +59,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut auth_methods: Vec<u8> = Vec::new();
 
     // Allow unauthenticated connections
-    if opt.no_auth { auth_methods.push(merino::AuthMethods::NoAuth as u8); }
+    if opt.no_auth { auth_methods.push(merino::AuthMethods::NoAuth.code()); }
 
     // Enable username/password auth
     let authed_users: Result<Vec<User>, Box<dyn Error>> = match opt.users {
         Some(users_file) => {
-            auth_methods.push(AuthMethods::UserPass as u8);
+            auth_methods.push(AuthMethods::UserPass.code());
             let file = std::fs::File::open(users_file)?;
 
             let mut users: Vec<User> = Vec::new();

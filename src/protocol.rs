@@ -1,8 +1,8 @@
 ///! rfc1928 SOCKS Protocol Version 5
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 /// Section 6. Replies > Reply field value
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResponseCode {
     Success = 0x00,
     Failure = 0x01,
@@ -34,6 +34,51 @@ impl fmt::Display for ResponseCode {
             TtlExpired => write!(f, "TTL expired"),
             CommandNotSupported => write!(f, "Command not supported"),
             AddrTypeNotSupported => write!(f, "Address type not supported"),
+        }
+    }
+}
+
+/// Client Authentication Methods
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AuthMethods {
+    /// No Authentication
+    NoAuth,
+    /// GSSAPI
+    GssApi,
+    /// Authenticate with a username / password
+    UserPass,
+    /// IANA assigned method
+    IANAMethod(u8),
+    /// Reserved for private method
+    Private(u8),
+    /// No acceptable method
+    NoMethods,
+}
+
+impl AuthMethods {
+    pub fn code(&self) -> u8 {
+        use AuthMethods::*;
+        match self {
+            NoAuth => 0x00,
+            GssApi => 0x01,
+            UserPass => 0x02,
+            IANAMethod(c) => *c,
+            Private(c) => *c,
+            NoMethods => 0xff,
+        }
+    }
+}
+
+impl fmt::Display for AuthMethods {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use AuthMethods::*;
+        match self {
+            NoAuth => write!(f, "No Authentication Required"),
+            GssApi => write!(f, "GSSAPI"),
+            UserPass => write!(f, "Username/Password"),
+            IANAMethod(c) =>write!(f, "IANA Assigned: {:#X}", c),
+            Private(c) => write!(f, "Private Methods: {:#X}", c),
+            NoMethods => write!(f, "No Acceptable Methods"),
         }
     }
 }

@@ -6,7 +6,7 @@ pub mod error;
 pub mod protocol;
 
 use error::*;
-use protocol::ResponseCode;
+pub use protocol::{AuthMethods, ResponseCode};
 
 use std::io::prelude::*;
 use std::io::copy;
@@ -75,17 +75,6 @@ impl SockCommand {
     }
 }
 
-
-/// Client Authentication Methods
-pub enum AuthMethods {
-    /// No Authentication
-    NoAuth = 0x00,
-    // GssApi = 0x01,
-    /// Authenticate with a username / password
-    UserPass = 0x02,
-    /// Cannot authenticate
-    NoMethods = 0xFF
-}
 
 pub struct Merino {
     listener: TcpListener,
@@ -216,9 +205,9 @@ impl SOCKClient {
         // Set the version in the response
         response[0] = SOCKS_VERSION;
         
-        if methods.contains(&(AuthMethods::UserPass as u8)) {
+        if methods.contains(&AuthMethods::UserPass.code()) {
             // Set the default auth method (NO AUTH)
-            response[1] = AuthMethods::UserPass as u8;
+            response[1] = AuthMethods::UserPass.code();
 
             debug!("Sending USER/PASS packet");
             self.stream.write_all(&response)?;
@@ -282,16 +271,16 @@ impl SOCKClient {
 
             Ok(())
         }
-        else if methods.contains(&(AuthMethods::NoAuth as u8)) {
+        else if methods.contains(&AuthMethods::NoAuth.code()) {
             // set the default auth method (no auth)
-            response[1] = AuthMethods::NoAuth as u8;
+            response[1] = AuthMethods::NoAuth.code();
             debug!("Sending NOAUTH packet");
             self.stream.write_all(&response)?;
             Ok(())
         }
         else {
             warn!("Client has no suitable Auth methods!");
-            response[1] = AuthMethods::NoMethods as u8;
+            response[1] = AuthMethods::NoMethods.code();
             self.stream.write_all(&response)?;
             self.shutdown()?;
             Err(ResponseCode::Failure.into())
