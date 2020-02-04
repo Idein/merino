@@ -1,5 +1,6 @@
 ///! rfc1928 SOCKS Protocol Version 5
 use std::fmt;
+use std::convert::TryFrom;
 
 /// Section 6. Replies > Reply field value
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -96,3 +97,61 @@ impl fmt::Display for AuthMethods {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TryFromU8Error {
+    /// source value
+    value: u8,
+    /// target type
+    to: String,
+}
+
+impl fmt::Display for TryFromU8Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "try from u8({:#X}) error to {}", self.value, self.to)
+    }
+}
+
+impl std::error::Error for TryFromU8Error {
+    fn description(&self) -> &str { "TryFromU8Error" }
+
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+
+/// ATYP
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AddrType {
+    V4 = 0x01,
+    Domain = 0x03,
+    V6 = 0x04,
+}
+
+
+impl TryFrom<u8> for AddrType {
+    type Error = TryFromU8Error;
+    /// Parse Byte to Command
+    fn try_from(n: u8) -> Result<AddrType, Self::Error> {
+        match n {
+            1 => Ok(AddrType::V4),
+            3 => Ok(AddrType::Domain),
+            4 => Ok(AddrType::V6),
+            _ => Err(TryFromU8Error { value: n, to: "protocol::AddrType".to_owned() })
+        }
+    }
+}
+
+impl fmt::Display for AddrType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use AddrType::*;
+        match self {
+            V4 => write!(f, "Version4 IP Address"),
+            Domain => write!(f, "Fully Qualified Domain Name"),
+            V6 => write!(f, "Version6 IP Address"),
+        }
+    }
+}
+
+

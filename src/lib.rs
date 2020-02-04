@@ -7,7 +7,9 @@ pub mod protocol;
 
 use error::*;
 pub use protocol::{AuthMethods, ResponseCode};
+use protocol::AddrType;
 
+use std::convert::TryInto;
 use std::io::prelude::*;
 use std::io::copy;
 use std::net::{Shutdown, TcpStream, TcpListener, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
@@ -25,35 +27,6 @@ pub struct User {
     password: String
 }
 
-
-/// DST.addr variant types
-#[derive(PartialEq)]
-enum AddrType {
-    V4 = 0x01,
-    Domain = 0x03,
-    V6 = 0x04,
-}
-
-impl AddrType {
-    /// Parse Byte to Command
-    fn from(n: usize) -> Option<AddrType> {
-        match n {
-            1 => Some(AddrType::V4),
-            3 => Some(AddrType::Domain),
-            4 => Some(AddrType::V6),
-            _ => None
-        }
-    }
-
-    // /// Return the size of the AddrType
-    // fn size(&self) -> u8 {
-    //     match self {
-    //         AddrType::V4 => 4,
-    //         AddrType::Domain => 1,
-    //         AddrType::V6 => 16
-    //     }
-    // }
-}
 
 /// SOCK5 CMD Type
 #[derive(Debug)]
@@ -465,13 +438,13 @@ impl SOCKSReq {
         // DST.address
 
         let mut addr_type: AddrType = AddrType::V6;
-        match AddrType::from(packet[3] as usize) {
-            Some(addr) => {
+        match packet[3].try_into() {
+            Ok(addr) => {
                 addr_type = addr ;
                 Ok(())
             },
-            None => {
-                error!("No Addr");
+            Err(err) => {
+                error!("No Addr: {:?}", err);
                 stream.shutdown(Shutdown::Both)?;
                 Err(ResponseCode::AddrTypeNotSupported)
             }
