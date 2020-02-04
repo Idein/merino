@@ -269,9 +269,6 @@ impl SOCKClient {
             // Parse Request
             let req = SOCKSReq::from_stream(&mut self.stream)?;
             
-            if req.addr_type == AddrType::V6 {
-            }
-
             // Log Request
             info!("New Request: Source: {}, Command: {:?} Addr: {}", 
                   self.stream.peer_addr()?.ip(),
