@@ -69,6 +69,20 @@ impl AuthMethods {
     }
 }
 
+impl From<u8> for AuthMethods {
+    fn from(code: u8) -> Self {
+        use AuthMethods::*;
+        match code {
+            0x00 => NoAuth,
+            0x01 => GssApi,
+            0x02 => UserPass,
+            0x03..=0x7F => IANAMethod(code),
+            0x80..=0xFE => Private(code),
+            0xFF => NoAuth,
+        }
+    }
+}
+
 impl fmt::Display for AuthMethods {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use AuthMethods::*;
