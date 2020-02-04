@@ -56,15 +56,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Setup Proxy settings
 
-    let mut auth_methods: Vec<u8> = Vec::new();
+    let mut auth_methods: Vec<AuthMethods> = Vec::new();
 
     // Allow unauthenticated connections
-    if opt.no_auth { auth_methods.push(merino::AuthMethods::NoAuth.code()); }
+    if opt.no_auth { auth_methods.push(AuthMethods::NoAuth); }
 
     // Enable username/password auth
     let authed_users: Result<Vec<User>, Box<dyn Error>> = match opt.users {
         Some(users_file) => {
-            auth_methods.push(AuthMethods::UserPass.code());
+            auth_methods.push(AuthMethods::UserPass);
             let file = std::fs::File::open(users_file)?;
 
             let mut users: Vec<User> = Vec::new();

@@ -79,12 +79,12 @@ impl SockCommand {
 pub struct Merino {
     listener: TcpListener,
     users: Vec<User>,
-    auth_methods: Vec<u8>
+    auth_methods: Vec<AuthMethods>
 }
 
 impl Merino {
     /// Create a new Merino instance
-    pub fn new(port: u16,  ip: &str, auth_methods: Vec<u8>, users: Vec<User>) -> Result<Self, Error> {
+    pub fn new(port: u16,  ip: &str, auth_methods: Vec<AuthMethods>, users: Vec<User>) -> Result<Self, Error> {
         info!("Listening on {}:{}", ip, port);
         Ok(Merino {
             listener: TcpListener::bind((ip, port))?,
@@ -133,14 +133,14 @@ impl Merino {
 struct SOCKClient {
     stream: TcpStream,
     auth_nmethods: u8,
-    auth_methods: Vec<u8>,
+    auth_methods: Vec<AuthMethods>,
     authed_users: Vec<User>,
     socks_version: u8
 }
 
 impl SOCKClient {
     /// Create a new SOCKClient
-    pub fn new(stream: TcpStream, authed_users: Vec<User>, auth_methods: Vec<u8>) -> Self {
+    pub fn new(stream: TcpStream, authed_users: Vec<User>, auth_methods: Vec<AuthMethods>) -> Self {
         SOCKClient {
             stream,
             auth_nmethods: 0,
@@ -205,7 +205,7 @@ impl SOCKClient {
         // Set the version in the response
         response[0] = SOCKS_VERSION;
         
-        if methods.contains(&AuthMethods::UserPass.code()) {
+        if methods.contains(&AuthMethods::UserPass) {
             // Set the default auth method (NO AUTH)
             response[1] = AuthMethods::UserPass.code();
 
@@ -271,7 +271,7 @@ impl SOCKClient {
 
             Ok(())
         }
-        else if methods.contains(&AuthMethods::NoAuth.code()) {
+        else if methods.contains(&AuthMethods::NoAuth) {
             // set the default auth method (no auth)
             response[1] = AuthMethods::NoAuth.code();
             debug!("Sending NOAUTH packet");
@@ -362,13 +362,13 @@ impl SOCKClient {
     }
 
     /// Return the avalible methods based on `self.auth_nmethods`
-    fn get_avalible_methods(&mut self) -> Result<Vec<u8>, Error> {
-        let mut methods: Vec<u8> = Vec::with_capacity(self.auth_nmethods as usize);
+    fn get_avalible_methods(&mut self) -> Result<Vec<AuthMethods>, Error> {
+        let mut methods: Vec<AuthMethods> = Vec::with_capacity(self.auth_nmethods as usize);
         for _ in 0..self.auth_nmethods {
             let mut method = [0u8; 1];
             self.stream.read_exact(&mut method)?;
-            if self.auth_methods.contains(&method[0]) {
-                methods.append(&mut method.to_vec());
+            if self.auth_methods.contains(&(method[0].into())) {
+                methods.push(method[0].into());
             }
         }
         Ok(methods)
