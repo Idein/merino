@@ -69,7 +69,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut users: Vec<User> = Vec::new();
 
-
             let mut rdr = csv::Reader::from_reader(file);
             for result in rdr.deserialize() {
                 let record: User = result?;
@@ -88,7 +87,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     if auth_methods.is_empty() {
         warn!("No Authentication methods enabled. Clients will not be able to connect!");
     }
-
 
     // Create proxy server
     let mut merino = Merino::new(opt.port, &opt.ip, auth_methods, authed_users)?;
